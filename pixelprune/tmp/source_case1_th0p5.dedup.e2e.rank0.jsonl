@@ -1,0 +1,1 @@
+{"video": "/data/lijie/Bernini/assets/testcases/v2v/source_case1.mp4", "model": "/mnt/nfs/data/pretrained_models/Qwen3.6-35B-A3B/", "threshold": 0.5, "nframe": 64, "input_tokens": 23313, "generated_tokens": 9, "total_time_s": 1.6949180570081808, "response": "A dog is laying in the snow."}

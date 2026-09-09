@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import vlmeval; print\\(vlmeval.__file__\\)\")",
+      "Bash(pip show *)",
+      "Bash(pip list *)",
+      "Bash(conda run *)",
+      "Read(//root/miniconda3/**)",
+      "Bash(python3 -c \"import sys,json; [print\\(json.dumps\\(json.loads\\(l\\), indent=2\\)\\) for l in sys.stdin]\")",
+      "Bash(awk -F'\\\\t' 'NR>1 && $9==\"\\\\\"True\\\\\"\" {print $3, $4, $5, $6}' /data/lijie/PixelPrune/eval/LMUData/AI2D_TEST.tsv)",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import sys,json; d=json.loads\\(sys.stdin.read\\(\\)\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if k not in ['response']}, indent=2\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; [print\\(json.dumps\\({k:v for k,v in json.loads\\(l\\).items\\(\\) if 'ratio' in k or 'threshold' in k or 'env' in k or 'config' in k}, indent=2\\)\\) for l in sys.stdin]\")",
+      "Bash(python3 *)",
+      "Bash(xargs '-I{}' sh -c 'dir=$\\(dirname {}\\); echo \"$dir: $\\(head -1 {} | python3 -c \\\\\"import json,sys; r=json.loads\\(sys.stdin.read\\(\\)\\); print\\(\\\\\\\\\\\\\"thr=\\\\\"+str\\(r[\\\\\\\\\\\\\"threshold\\\\\\\\\\\\\"]\\)+\\\\\\\\\\\\\" N=\\\\\"+str\\(sum\\(1 for _ in open\\(\\\\\\\\\\\\\"$1\\\\\\\\\\\\\"\\)\\)\\),\\\\\\\\\\\\\"\\)\\\\\\\\\\\\\"\\\\n\\\\\" --\\)\"' _ '{}')",
+      "Read(//data/lijie/VLMEvalKit/outputs/infovqa/**)",
+      "Read(//data/lijie/VLMEvalKit/outputs/textvqa/**)",
+      "Read(//data/lijie/VLMEvalKit/**)",
+      "Bash(PYTHONPATH=/data/lijie/PixelPrune/eval:/data/lijie/VLMEvalKit python -c ' *)",
+      "Bash(python *)",
+      "Bash(nvidia-smi *)",
+      "Bash(tee /tmp/interframe_ablation.log)"
+    ]
+  }
+}

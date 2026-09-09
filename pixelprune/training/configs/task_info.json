@@ -1,0 +1,11 @@
+{
+    "my_task": {
+        "dataset": {
+            "file_pattern": [
+                "/path/to/data/*.jsonl"
+            ]
+        },
+        "num_workers": 4,
+        "task_type": "MultiTurn"
+    }
+}
