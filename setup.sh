@@ -230,7 +230,6 @@ verify_environment() {
     ASCEND_RT_VISIBLE_DEVICES=$VERIFY_DEVICE "$PYTHON_BIN" - <<'PY'
 import torch
 import torch_npu
-import flash_attn_npu
 import pixelprune
 import transformers
 import diffusers
@@ -247,9 +246,23 @@ print("accelerate:", accelerate.__version__)
 print("decord:", decord.__version__)
 print("NPU available:", torch.npu.is_available())
 assert torch.npu.is_available(), "torch.npu.is_available() is False"
+assert hasattr(torch_npu, "npu_fusion_attention"), "torch_npu.npu_fusion_attention is unavailable"
 
 x = torch.randn(2, 2, dtype=torch.float16, device="npu:0")
 print("NPU matmul:", x @ x)
+
+q = torch.randn(1, 128, 2, 128, dtype=torch.float16, device="npu:0")
+fa_out = torch_npu.npu_fusion_attention(
+    q,
+    q,
+    q,
+    head_num=2,
+    input_layout="BSND",
+    scale=128 ** -0.5,
+    pre_tockens=2147483647,
+    next_tockens=2147483647,
+)[0]
+print("npu_fusion_attention:", tuple(fa_out.shape))
 print("All required imports succeeded")
 PY
 
@@ -327,24 +340,33 @@ log "Installing Bernini runtime dependencies"
     pillow \
     tqdm \
     ftfy \
-    scipy \
+    'scipy>=1.7.3' \
     imageio==2.37.3 \
     imageio-ffmpeg==0.6.0 \
     opencv-python==4.11.0.86 \
     blobfile==3.1.0 \
     datasets==2.21.0 \
     packaging==25.0 \
-    attrs \
-    decorator \
+    'attrs>=23.0.0' \
+    'decorator>=5.1.0' \
     pyzmq \
     strenum \
     tiktoken \
-    psutil \
+    'psutil>=5.9.0' \
     timm \
     wandb \
     pytest \
-    huggingface_hub \
-    flash_attn_npu==0.1.1
+    huggingface_hub
+
+log "Checking PyTorch and the built-in TorchNPU fused-attention API"
+"$PYTHON_BIN" - <<'PY'
+import torch
+import torch_npu
+
+print("torch:", torch.__version__)
+print("torch_npu:", torch_npu.__version__)
+assert hasattr(torch_npu, "npu_fusion_attention"), "torch_npu.npu_fusion_attention is unavailable"
+PY
 
 log "Installing VeOmni at $VEOMNI_REF"
 "$PYTHON_BIN" -m pip install --no-deps \
