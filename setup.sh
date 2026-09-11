@@ -23,6 +23,7 @@ CONDA_ROOT=${CONDA_ROOT:-${BASE_ROOT}/miniforge3}
 CONDA_ENV_NAME=${CONDA_ENV_NAME:-bernini}
 RAINFUSION_ENV=${RAINFUSION_ENV:-}
 MINDIESD_DIR=${MINDIESD_DIR:-${BASE_ROOT}/MindIE-SD}
+VEOMNI_DIR=${VEOMNI_DIR:-${BASE_ROOT}/VeOmni}
 DECORD_DIR=${DECORD_DIR:-${BASE_ROOT}/decord}
 MODEL_DIR=${MODEL_DIR:-${BASE_ROOT}/model/Bernini-Diffusers}
 EDITVERSE_DATA_ROOT=${EDITVERSE_DATA_ROOT:-${BASE_ROOT}/datasets/EditVerse/EditVerseBench}
@@ -36,6 +37,7 @@ TORCH_NPU_VERSION=${TORCH_NPU_VERSION:-2.8.0.post4}
 TORCHVISION_VERSION=${TORCHVISION_VERSION:-0.23.0}
 TORCHDATA_VERSION=${TORCHDATA_VERSION:-0.11.0}
 MINDIESD_REF=${MINDIESD_REF:-ff8eb69e5f5e323210e07362bb0e16759b8d1cad}
+VEOMNI_TAG=${VEOMNI_TAG:-v0.1.10}
 VEOMNI_REF=${VEOMNI_REF:-6ab293ecdfdd90ef3941fc81065d9f947b5b4e4f}
 DECORD_REF=${DECORD_REF:-d2e56190286ae394032a8141885f76d5372bd44b}
 BUILD_JOBS=${BUILD_JOBS:-8}
@@ -347,6 +349,7 @@ log "Installing Bernini runtime dependencies"
     blobfile==3.1.0 \
     datasets==2.21.0 \
     packaging==25.0 \
+    'absl-py>=2.0.0' \
     'attrs>=23.0.0' \
     'decorator>=5.1.0' \
     pyzmq \
@@ -368,9 +371,50 @@ print("torch_npu:", torch_npu.__version__)
 assert hasattr(torch_npu, "npu_fusion_attention"), "torch_npu.npu_fusion_attention is unavailable"
 PY
 
-log "Installing VeOmni at $VEOMNI_REF"
-"$PYTHON_BIN" -m pip install --no-deps \
-    "git+https://github.com/ByteDance-Seed/VeOmni.git@$VEOMNI_REF"
+install_veomni() {
+    command -v git >/dev/null 2>&1 || die "git is required to install VeOmni"
+
+    if [[ ! -d "$VEOMNI_DIR/.git" ]]; then
+        log "Preparing a local VeOmni checkout at $VEOMNI_DIR"
+        mkdir -p "$VEOMNI_DIR"
+        git -C "$VEOMNI_DIR" init
+        git -C "$VEOMNI_DIR" remote add origin https://github.com/ByteDance-Seed/VeOmni.git
+    else
+        git -C "$VEOMNI_DIR" remote set-url origin https://github.com/ByteDance-Seed/VeOmni.git
+    fi
+
+    # Fetch the small pinned tag without Git's partial-clone/promisor mode.
+    # VS Code sometimes leaves a GIT_ASKPASS path pointing at a deleted server
+    # installation, so remove those variables for this public repository.
+    local attempt fetched=0
+    for attempt in 1 2 3; do
+        log "Fetching VeOmni $VEOMNI_TAG (attempt $attempt/3)"
+        if env \
+            -u GIT_ASKPASS \
+            -u SSH_ASKPASS \
+            -u VSCODE_GIT_ASKPASS_NODE \
+            -u VSCODE_GIT_ASKPASS_MAIN \
+            -u VSCODE_GIT_IPC_HANDLE \
+            GIT_TERMINAL_PROMPT=0 \
+            git -C "$VEOMNI_DIR" -c http.version=HTTP/1.1 \
+                fetch --force --depth=1 origin "refs/tags/$VEOMNI_TAG"; then
+            fetched=1
+            break
+        fi
+    done
+    (( fetched == 1 )) || die "Failed to fetch VeOmni after 3 attempts. Check this machine's GitHub connection."
+
+    git -C "$VEOMNI_DIR" checkout --detach FETCH_HEAD
+    local actual_ref
+    actual_ref=$(git -C "$VEOMNI_DIR" rev-parse HEAD)
+    [[ "$actual_ref" == "$VEOMNI_REF" ]] || \
+        die "VeOmni $VEOMNI_TAG resolved to $actual_ref, expected $VEOMNI_REF"
+
+    log "Installing VeOmni from the verified local checkout"
+    "$PYTHON_BIN" -m pip install --no-deps "$VEOMNI_DIR"
+}
+
+install_veomni
 
 install_decord_from_source() {
     command -v pkg-config >/dev/null 2>&1 || \
