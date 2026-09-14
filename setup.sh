@@ -306,6 +306,8 @@ else
 fi
 
 export PATH="$RAINFUSION_ENV/bin:$PATH"
+# Do not let packages under /root/.local leak into the named Conda environment.
+export PYTHONNOUSERSITE=1
 
 log "Updating Python packaging and build tools"
 "$PYTHON_BIN" -m pip install -U pip setuptools wheel cmake ninja
@@ -423,6 +425,47 @@ install_decord_from_source() {
         die "FFmpeg development libraries are missing. On openEuler install ffmpeg-devel; on Ubuntu install libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev."
     fi
 
+    # A .pc file and the shared libraries can exist even when the development
+    # headers are not installed. Decord specifically needs this header root.
+    local ffmpeg_include_dir="" candidate flag
+    candidate=$(pkg-config --variable=includedir libavcodec 2>/dev/null || true)
+    if [[ -n "$candidate" && -f "$candidate/libavcodec/avcodec.h" ]]; then
+        ffmpeg_include_dir=$candidate
+    fi
+    if [[ -z "$ffmpeg_include_dir" ]]; then
+        for flag in $(pkg-config --cflags-only-I libavcodec 2>/dev/null || true); do
+            candidate=${flag#-I}
+            if [[ -f "$candidate/libavcodec/avcodec.h" ]]; then
+                ffmpeg_include_dir=$candidate
+                break
+            fi
+        done
+    fi
+    if [[ -z "$ffmpeg_include_dir" ]]; then
+        for candidate in /usr/include /usr/include/ffmpeg /usr/local/include /usr/local/include/ffmpeg; do
+            if [[ -f "$candidate/libavcodec/avcodec.h" ]]; then
+                ffmpeg_include_dir=$candidate
+                break
+            fi
+        done
+    fi
+    if [[ -z "$ffmpeg_include_dir" ]]; then
+        cat >&2 <<'EOF'
+
+FFmpeg runtime libraries were found, but the development header
+libavcodec/avcodec.h is missing. Install the package that owns it, then rerun
+this setup script. On openEuler/RHEL-compatible systems, run as root:
+
+  dnf provides '*/libavcodec/avcodec.h'
+  dnf install -y ffmpeg-devel
+
+If the first command reports a differently named package, install that package
+instead of ffmpeg-devel.
+EOF
+        return 1
+    fi
+    log "Using FFmpeg headers from $ffmpeg_include_dir"
+
     if [[ ! -d "$DECORD_DIR/.git" ]]; then
         log "Cloning Decord into $DECORD_DIR"
         git clone --recursive https://github.com/dmlc/decord.git "$DECORD_DIR"
@@ -432,7 +475,9 @@ install_decord_from_source() {
 
     log "Building Decord without CUDA"
     cmake -S "$DECORD_DIR" -B "$DECORD_DIR/build" \
-        -DUSE_CUDA=0 -DCMAKE_BUILD_TYPE=Release
+        -DUSE_CUDA=0 \
+        -DFFMPEG_AVCODEC_INCLUDE_DIR="$ffmpeg_include_dir" \
+        -DCMAKE_BUILD_TYPE=Release
     cmake --build "$DECORD_DIR/build" --parallel "$BUILD_JOBS"
     "$PYTHON_BIN" -m pip install --no-deps -e "$DECORD_DIR/python"
 }
