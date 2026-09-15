@@ -294,10 +294,49 @@ def editing_rainfusion_attention(
     It has no timestep skip, dense teacher, compensation, or residual cache.
     """
     _check_rainfusion_inputs(query, key, value, target_start, target_length, target_grid, sparsity)
+
+    try:
+        from mindiesd.utils.get_platform import is_a5_device
+    except ImportError:
+        is_a5 = False
+    else:
+        is_a5 = bool(is_a5_device())
+
+    if is_a5:
+        try:
+            from mindiesd.layers.flash_attn.sparse_flash_attn import sparse_attention
+        except ImportError as exc:
+            raise RuntimeError(
+                "Ascend 950 RainFusion requires the MindIE-SD public sparse_attention API."
+            ) from exc
+
+        # The public API maps rf_v2 to RF-v3 on A5 and forces the kernel's
+        # required inner_precise=4.  video_spans keeps the packed prefix as
+        # dense context while sparsifying and first-frame-protecting the target.
+        output = sparse_attention(
+            query.unsqueeze(0),
+            key.unsqueeze(0),
+            value.unsqueeze(0),
+            scale=query.shape[-1] ** -0.5,
+            head_num=query.shape[1],
+            input_layout="BSND",
+            inner_precise=4,
+            sparse_type="rf_v2",
+            block_size=block_size,
+            sparsity=sparsity,
+            video_spans=[
+                {
+                    "start": target_start,
+                    "latent_shape": list(target_grid),
+                }
+            ],
+        )
+        return output.squeeze(0).reshape_as(query).contiguous()
+
     try:
         from mindiesd.layers.flash_attn.sparse_flash_attn_rf_v2 import rain_fusion_attention
     except ImportError as exc:
-        raise RuntimeError("RainFusion v3 requires MindIE-SD sparse_flash_attn_rf_v2.") from exc
+        raise RuntimeError("RainFusion requires a compatible MindIE-SD installation.") from exc
 
     select_idx, select_num_idx = build_editing_rainfusion_selector(
         query,

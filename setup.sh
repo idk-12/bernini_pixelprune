@@ -238,7 +238,7 @@ import diffusers
 import accelerate
 import decord
 import veomni
-from mindiesd.layers.flash_attn.sparse_flash_attn_rf_v2 import rain_fusion_attention
+from mindiesd.layers.flash_attn.sparse_flash_attn import sparse_attention
 
 print("torch:", torch.__version__)
 print("torch_npu:", torch_npu.__version__)
@@ -276,11 +276,9 @@ PY
         tests/test_rainfusion.py::test_npu_single_block_v3_matches_dense_attention; then
         cat >&2 <<'EOF'
 
-The Python/NPU environment was installed, but the Bernini RainFusion integration
-test failed. On Ascend 950 (A5), current MindIE-SD rejects the legacy
-sparse_flash_attn_rf_v2 entry point and requires the RF-v3/public sparse API.
-Do not run the four full benchmark scripts until bernini/bernini/attention.py is
-adapted and this test passes.
+The Python/NPU environment was installed, but the Bernini public RF-v3
+integration test failed. Do not run the four full benchmark scripts until the
+error above is resolved and this test passes.
 EOF
         return 2
     fi

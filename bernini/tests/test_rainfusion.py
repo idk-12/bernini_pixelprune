@@ -78,7 +78,7 @@ def test_npu_single_block_v3_matches_dense_attention():
     torch_npu = pytest.importorskip("torch_npu")
     if not torch.npu.is_available():
         pytest.skip("Ascend NPU is not available")
-    pytest.importorskip("mindiesd.layers.flash_attn.sparse_flash_attn_rf_v2")
+    pytest.importorskip("mindiesd.layers.flash_attn.sparse_flash_attn")
 
     from bernini.attention import editing_rainfusion_attention
 
