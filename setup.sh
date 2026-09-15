@@ -473,6 +473,36 @@ EOF
     git -C "$DECORD_DIR" fetch origin "$DECORD_REF"
     git -C "$DECORD_DIR" checkout --detach "$DECORD_REF"
 
+    local avcodec_major
+    avcodec_major=$(pkg-config --modversion libavcodec | cut -d. -f1)
+    if [[ "$avcodec_major" =~ ^[0-9]+$ ]] && (( avcodec_major >= 59 )); then
+        log "Applying Decord compatibility fixes for libavcodec $avcodec_major"
+        "$PYTHON_BIN" - "$DECORD_DIR" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+
+common = root / "src/video/ffmpeg/ffmpeg_common.h"
+text = common.read_text()
+bsf_include = "#include <libavcodec/bsf.h>"
+if bsf_include not in text:
+    anchor = "#include <libavcodec/avcodec.h>"
+    if anchor not in text:
+        raise SystemExit(f"could not patch {common}: include anchor is missing")
+    common.write_text(text.replace(anchor, f"{anchor}\n{bsf_include}", 1))
+
+reader = root / "src/video/video_reader.cc"
+text = reader.read_text()
+old = "AVCodec *dec;"
+new = "const AVCodec *dec;"
+if new not in text:
+    if old not in text:
+        raise SystemExit(f"could not patch {reader}: decoder declaration is missing")
+    reader.write_text(text.replace(old, new, 1))
+PY
+    fi
+
     log "Building Decord without CUDA"
     cmake -S "$DECORD_DIR" -B "$DECORD_DIR/build" \
         -DUSE_CUDA=0 \
