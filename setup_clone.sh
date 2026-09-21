@@ -24,7 +24,12 @@ VERIFY_PHYSICAL_DEVICE=${VERIFY_PHYSICAL_DEVICE:-${VISIBLE_DEVICES%%,*}}
 CLONE_WORK_ROOT=${CLONE_WORK_ROOT:-${BASE_ROOT}/bernini_clone_work}
 CLONE_TMPDIR=${CLONE_TMPDIR:-${CLONE_WORK_ROOT}/tmp}
 PIP_CACHE_DIR=${PIP_CACHE_DIR:-${CLONE_WORK_ROOT}/pip-cache}
-CONDA_PKGS_DIRS=${CONDA_PKGS_DIRS:-${CLONE_WORK_ROOT}/conda-pkgs}
+CLONE_CONDA_PKGS_DIR=${CLONE_CONDA_PKGS_DIR:-${CLONE_WORK_ROOT}/conda-pkgs}
+# Optional colon-separated list of package caches belonging to the source
+# environment's Conda installation.  They are searched after the writable
+# clone cache and are never cleaned by this script.
+SOURCE_CONDA_PKGS_DIRS=${SOURCE_CONDA_PKGS_DIRS:-}
+REQUESTED_CONDA_PKGS_DIRS=${CONDA_PKGS_DIRS:-}
 REQUIRED_CANN_ROOT=${REQUIRED_CANN_ROOT:-/usr/local/Ascend/cann-9.1.0}
 FORBIDDEN_CANN_ROOT=${FORBIDDEN_CANN_ROOT:-/home/qirui1547986/Ascend/cann-9.2.0}
 CANN_ENV_SCRIPT=${CANN_ENV_SCRIPT:-${REQUIRED_CANN_ROOT}/set_env.sh}
@@ -69,11 +74,60 @@ Important optional overrides:
   ASCEND_RT_VISIBLE_DEVICES=6,7
   BUILD_JOBS=8
   CLONE_WORK_ROOT=/home/lijie154/bernini_clone_work
+  SOURCE_CONDA_PKGS_DIRS=/home/qirui1547986/miniconda3/pkgs
 
 This script never runs setup.sh and never uses pip install -U.  It does not
 modify SOURCE_ENV.  Re-running it reuses CLONE_ENV and only retries unfinished
 steps.  To make a completely fresh clone, choose a new CLONE_ENV path.
 EOF
+}
+
+configure_conda_package_caches() {
+    local source_owner_root candidate cache_list=
+    local -a candidates=() requested_caches=() source_caches=()
+
+    # The first cache is on /home and is writable.  Conda can download or
+    # extract here without filling the root filesystem.
+    mkdir -p "$CLONE_CONDA_PKGS_DIR"
+    candidates+=("$CLONE_CONDA_PKGS_DIR")
+
+    if [[ -n "$REQUESTED_CONDA_PKGS_DIRS" ]]; then
+        IFS=: read -r -a requested_caches <<<"$REQUESTED_CONDA_PKGS_DIRS"
+        candidates+=("${requested_caches[@]}")
+    elif [[ -n "$SOURCE_CONDA_PKGS_DIRS" ]]; then
+        IFS=: read -r -a source_caches <<<"$SOURCE_CONDA_PKGS_DIRS"
+        candidates+=("${source_caches[@]}")
+    else
+        # The source prefix lives outside our Conda base.  A Conda clone still
+        # needs the original package cache records, so search the common cache
+        # locations for both installations instead of hiding them behind a new
+        # empty CONDA_PKGS_DIRS.
+        source_owner_root=$(dirname -- "$(dirname -- "$SOURCE_ENV")")
+        candidates+=(
+            "$source_owner_root/.conda/pkgs"
+            "$source_owner_root/miniconda3/pkgs"
+            "$source_owner_root/anaconda3/pkgs"
+            "$CONDA_BASE/pkgs"
+            "/root/.conda/pkgs"
+        )
+    fi
+
+    local -A seen=()
+    for candidate in "${candidates[@]}"; do
+        [[ -n "$candidate" && -d "$candidate" ]] || continue
+        candidate=$(cd -- "$candidate" && pwd -P)
+        [[ -z "${seen[$candidate]:-}" ]] || continue
+        seen[$candidate]=1
+        if [[ -n "$cache_list" ]]; then
+            cache_list+=":$candidate"
+        else
+            cache_list=$candidate
+        fi
+    done
+
+    [[ -n "$cache_list" ]] || die "no usable Conda package cache was found"
+    export CONDA_PKGS_DIRS=$cache_list
+    log "Conda package caches: $CONDA_PKGS_DIRS"
 }
 
 MODE=install
@@ -627,14 +681,14 @@ EOF
 resolve_layout
 detect_cann_env
 export PYTHONNOUSERSITE=1
-mkdir -p "$CLONE_TMPDIR" "$PIP_CACHE_DIR" "$CONDA_PKGS_DIRS"
+mkdir -p "$CLONE_TMPDIR" "$PIP_CACHE_DIR"
 export TMPDIR=$CLONE_TMPDIR
 export PIP_CACHE_DIR
-export CONDA_PKGS_DIRS
 
 [[ -x "$CONDA_BIN" ]] || die "CONDA_BIN is not executable: $CONDA_BIN"
 CONDA_BASE=$($CONDA_BIN info --base)
 [[ -n "$CONDA_BASE" ]] || die "could not determine the Conda base directory"
+configure_conda_package_caches
 CONDA_SH=$CONDA_BASE/etc/profile.d/conda.sh
 [[ -f "$CONDA_SH" ]] || die "Conda activation script is missing: $CONDA_SH"
 
