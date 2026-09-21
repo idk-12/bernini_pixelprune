@@ -12,11 +12,11 @@ trap 'printf "\nERROR: setup_clone.sh failed at line %s: %s\n" "$LINENO" "$BASH_
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 
 SOURCE_ENV=${SOURCE_ENV:-/home/qirui1547986/conda-envs/qirui_sparse}
-BASE_ROOT=${BASE_ROOT:-/home/lijie154}
+PROJECT_ROOT=${PROJECT_ROOT:-$SCRIPT_DIR}
+BASE_ROOT=${BASE_ROOT:-$(dirname -- "$PROJECT_ROOT")}
 CLONE_ENV_NAME=${CLONE_ENV_NAME:-bernini_clone}
 CLONE_ENV_ROOT=${CLONE_ENV_ROOT:-${BASE_ROOT}/conda-envs}
 CLONE_ENV=${CLONE_ENV:-${CLONE_ENV_ROOT}/${CLONE_ENV_NAME}}
-PROJECT_ROOT=${PROJECT_ROOT:-$SCRIPT_DIR}
 CONDA_BIN=${CONDA_BIN:-/root/miniconda3/bin/conda}
 BUILD_JOBS=${BUILD_JOBS:-8}
 VISIBLE_DEVICES=${ASCEND_RT_VISIBLE_DEVICES:-6,7}
@@ -34,7 +34,7 @@ REQUIRED_CANN_ROOT=${REQUIRED_CANN_ROOT:-/usr/local/Ascend/cann-9.1.0}
 FORBIDDEN_CANN_ROOT=${FORBIDDEN_CANN_ROOT:-/home/qirui1547986/Ascend/cann-9.2.0}
 CANN_ENV_SCRIPT=${CANN_ENV_SCRIPT:-${REQUIRED_CANN_ROOT}/set_env.sh}
 
-MODEL_DIR=${MODEL_DIR:-/home/weights/Bernini-Diffusers}
+MODEL_DIR=${MODEL_DIR:-${BASE_ROOT}/Bernini-Diffusers}
 EDITVERSE_DATA_ROOT=${EDITVERSE_DATA_ROOT:-${BASE_ROOT}/datasets/EditVerse/EditVerseBench}
 OPENVE_ROOT=${OPENVE_ROOT:-${BASE_ROOT}/datasets/OpenVE}
 VEOMNI_DIR=${VEOMNI_DIR:-${BASE_ROOT}/VeOmni}
@@ -62,18 +62,20 @@ Usage:
 
 The default source and destination are:
   source: /home/qirui1547986/conda-envs/qirui_sparse
-  target: /home/lijie154/conda-envs/bernini_clone
+  target: <project-parent>/conda-envs/bernini_clone
 
 Important optional overrides:
   SOURCE_ENV=/path/to/working/environment
-  CLONE_ENV=/home/lijie154/conda-envs/bernini_clone
-  PROJECT_ROOT=/home/lijie154/bernini_pixelprune
+  BASE_ROOT=/home/<user>
+  CLONE_ENV=/home/<user>/conda-envs/bernini_clone
+  PROJECT_ROOT=/home/<user>/bernini_pixelprune
+  MODEL_DIR=/home/<user>/Bernini-Diffusers
   CONDA_BIN=/root/miniconda3/bin/conda
   CANN_ENV_SCRIPT=/usr/local/Ascend/cann-9.1.0/set_env.sh
   REQUIRED_CANN_ROOT=/usr/local/Ascend/cann-9.1.0
   ASCEND_RT_VISIBLE_DEVICES=6,7
   BUILD_JOBS=8
-  CLONE_WORK_ROOT=/home/lijie154/bernini_clone_work
+  CLONE_WORK_ROOT=/home/<user>/bernini_clone_work
   SOURCE_CONDA_PKGS_DIRS=/home/qirui1547986/miniconda3/pkgs
 
 This script never runs setup.sh and never uses pip install -U.  It does not

@@ -6,7 +6,7 @@ trap 'printf "\nERROR: setup failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" 
 # Ascend 950DT environment bootstrap for the combined bernini_pixelprune repo.
 #
 # Expected remote layout:
-#   /home/lijie154/bernini_pixelprune/
+#   /home/<user>/bernini_pixelprune/
 #     bernini/
 #     pixelprune/
 #     setup.sh
@@ -15,8 +15,9 @@ trap 'printf "\nERROR: setup failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" 
 # and it does NOT download models or datasets. The machine provider must first
 # install a CANN release that supports Ascend 950 (CANN 9.0+).
 
-PROJECT_ROOT=${PROJECT_ROOT:-/home/lijie154/bernini_pixelprune}
-BASE_ROOT=${BASE_ROOT:-/home/lijie154}
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+PROJECT_ROOT=${PROJECT_ROOT:-$SCRIPT_DIR}
+BASE_ROOT=${BASE_ROOT:-$(dirname -- "$PROJECT_ROOT")}
 BERNINI_DIR=${BERNINI_DIR:-${PROJECT_ROOT}/bernini}
 PIXELPRUNE_DIR=${PIXELPRUNE_DIR:-${PROJECT_ROOT}/pixelprune}
 CONDA_ROOT=${CONDA_ROOT:-${BASE_ROOT}/miniforge3}
@@ -25,7 +26,7 @@ RAINFUSION_ENV=${RAINFUSION_ENV:-}
 MINDIESD_DIR=${MINDIESD_DIR:-${BASE_ROOT}/MindIE-SD}
 VEOMNI_DIR=${VEOMNI_DIR:-${BASE_ROOT}/VeOmni}
 DECORD_DIR=${DECORD_DIR:-${BASE_ROOT}/decord}
-MODEL_DIR=${MODEL_DIR:-${BASE_ROOT}/model/Bernini-Diffusers}
+MODEL_DIR=${MODEL_DIR:-${BASE_ROOT}/Bernini-Diffusers}
 EDITVERSE_DATA_ROOT=${EDITVERSE_DATA_ROOT:-${BASE_ROOT}/datasets/EditVerse/EditVerseBench}
 OPENVE_ROOT=${OPENVE_ROOT:-${BASE_ROOT}/datasets/OpenVE}
 
@@ -59,8 +60,9 @@ Usage:
   bash setup.sh --verify-only
 
 Optional overrides:
-  PROJECT_ROOT=/home/lijie154/bernini_pixelprune
-  BASE_ROOT=/home/lijie154
+  PROJECT_ROOT=/home/<user>/bernini_pixelprune
+  BASE_ROOT=/home/<user>
+  MODEL_DIR=/home/<user>/Bernini-Diffusers
   CANN_ENV_SCRIPT=/usr/local/Ascend/cann/set_env.sh
   CONDA_BIN=/path/to/conda
   CONDA_ENV_NAME=bernini
